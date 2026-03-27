@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and balance information",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "description": "Display name" },
+        "email": { "type": "string", "format": "email" },
+        "coins": { "type": "number", "description": "Virtual currency balance" },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User permissions" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["username", "email", "coins", "role"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "Cricket match details and prediction ratios",
+      "type": "object",
+      "properties": {
+        "teamA": { "type": "string" },
+        "teamB": { "type": "string" },
+        "ratioA": { "type": "number" },
+        "ratioB": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed", "completed"] },
+        "winner": { "type": "string", "enum": ["teamA", "teamB", "none"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["teamA", "teamB", "ratioA", "ratioB", "status"]
+    },
+    "Prediction": {
+      "title": "Prediction",
+      "description": "User prediction on a match",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "matchId": { "type": "string" },
+        "team": { "type": "string", "enum": ["teamA", "teamB"] },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "won", "lost", "refunded"] },
+        "winnings": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "matchId", "team", "amount", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Available matches"
+    },
+    "/predictions/{predictionId}": {
+      "schema": "Prediction",
+      "description": "User predictions"
+    }
+  }
+}

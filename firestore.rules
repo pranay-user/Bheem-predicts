@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Auth UID)
+    // Fields:
+    //   - username: string (required)
+    //   - email: string (required)
+    //   - coins: number (required)
+    //   - role: string (required, 'admin' or 'user')
+    //   - createdAt: timestamp (optional)
+    //
+    // Collection: matches
+    // Document ID: matchId
+    // Fields:
+    //   - teamA: string (required)
+    //   - teamB: string (required)
+    //   - ratioA: number (required)
+    //   - ratioB: number (required)
+    //   - status: string (required, 'open', 'closed', 'completed')
+    //   - winner: string (optional, 'teamA', 'teamB', 'none')
+    //   - createdAt: timestamp (optional)
+    //
+    // Collection: predictions
+    // Document ID: predictionId
+    // Fields:
+    //   - userId: string (required)
+    //   - matchId: string (required)
+    //   - team: string (required, 'teamA', 'teamB')
+    //   - amount: number (required)
+    //   - status: string (required, 'pending', 'won', 'lost', 'refunded')
+    //   - winnings: number (optional)
+    //   - createdAt: timestamp (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         request.auth.token.email == "admin@chotabheem.app" ||
+         request.auth.token.email == "pranay.02042008@gmail.com");
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUser(data) {
+      return hasRequiredFields(['username', 'email', 'coins', 'role']) &&
+             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.coins is number &&
+             data.role in ['admin', 'user'];
+    }
+
+    function isValidMatch(data) {
+      return hasRequiredFields(['teamA', 'teamB', 'ratioA', 'ratioB', 'status']) &&
+             data.teamA is string && data.teamA.size() > 0 &&
+             data.teamB is string && data.teamB.size() > 0 &&
+             data.ratioA is number && data.ratioA > 0 &&
+             data.ratioB is number && data.ratioB > 0 &&
+             data.status in ['open', 'closed', 'completed'];
+    }
+
+    function isValidPrediction(data) {
+      return hasRequiredFields(['userId', 'matchId', 'team', 'amount', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.team in ['teamA', 'teamB'] &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['pending', 'won', 'lost', 'refunded'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user');
+      allow update: if isAdmin() || (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role);
+    }
+
+    match /matches/{matchId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidMatch(request.resource.data);
+      allow update: if isAdmin() && isValidMatch(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /predictions/{predictionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidPrediction(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
